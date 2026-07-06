@@ -16,7 +16,7 @@ type UnionOfKeys<T> = T extends T ? keyof T : never;
 export type ProviderName = keyof typeof defaultProviderSettings
 export const providerNames = Object.keys(defaultProviderSettings) as ProviderName[]
 
-export const localProviderNames = ['ollama', 'vLLM', 'lmStudio'] satisfies ProviderName[] // all local names
+export const localProviderNames = ['llamaCpp', 'ollama', 'vLLM', 'lmStudio'] satisfies ProviderName[] // all local names
 export const nonlocalProviderNames = providerNames.filter((name) => !(localProviderNames as string[]).includes(name)) // all non-local names
 
 type CustomSettingName = UnionOfKeys<typeof defaultProviderSettings[ProviderName]>
@@ -82,6 +82,9 @@ export const displayInfoOfProviderName = (providerName: ProviderName): DisplayIn
 	else if (providerName === 'lmStudio') {
 		return { title: 'LM Studio', }
 	}
+	else if (providerName === 'llamaCpp') {
+		return { title: 'llama.cpp', }
+	}
 	else if (providerName === 'openAICompatible') {
 		return { title: 'OpenAI-Compatible', }
 	}
@@ -127,6 +130,7 @@ export const subTextMdOfProviderName = (providerName: ProviderName): string => {
 	if (providerName === 'ollama') return 'Read more about custom [Endpoints here](https://github.com/ollama/ollama/blob/main/docs/faq.md#how-can-i-expose-ollama-on-my-network).'
 	if (providerName === 'vLLM') return 'Read more about custom [Endpoints here](https://docs.vllm.ai/en/latest/getting_started/quickstart.html#openai-compatible-server).'
 	if (providerName === 'lmStudio') return 'Read more about custom [Endpoints here](https://lmstudio.ai/docs/app/api/endpoints/openai).'
+	if (providerName === 'llamaCpp') return 'Point this at a running `llama-server`. Read more about the [server here](https://github.com/ggml-org/llama.cpp/tree/master/tools/server).'
 	if (providerName === 'liteLLM') return 'Read more about endpoints [here](https://docs.litellm.ai/docs/providers/openai_compatible).'
 
 	throw new Error(`subTextMdOfProviderName: Unknown provider name: "${providerName}"`)
@@ -165,6 +169,7 @@ export const displayInfoOfSettingName = (providerName: ProviderName, settingName
 		return {
 			title: providerName === 'ollama' ? 'Endpoint' :
 				providerName === 'vLLM' ? 'Endpoint' :
+					providerName === 'llamaCpp' ? 'Endpoint' :
 					providerName === 'lmStudio' ? 'Endpoint' :
 						providerName === 'openAICompatible' ? 'baseURL' : // (do not include /chat/completions)
 							providerName === 'googleVertex' ? 'baseURL' :
@@ -174,6 +179,7 @@ export const displayInfoOfSettingName = (providerName: ProviderName, settingName
 											'(never)',
 
 			placeholder: providerName === 'ollama' ? defaultProviderSettings.ollama.endpoint
+				: providerName === 'llamaCpp' ? defaultProviderSettings.llamaCpp.endpoint
 				: providerName === 'vLLM' ? defaultProviderSettings.vLLM.endpoint
 					: providerName === 'openAICompatible' ? 'https://my-website.com/v1'
 						: providerName === 'lmStudio' ? defaultProviderSettings.lmStudio.endpoint
@@ -332,6 +338,12 @@ export const defaultSettingsOfProvider: SettingsOfProvider = {
 		...defaultCustomSettings,
 		...defaultProviderSettings.vLLM,
 		...modelInfoOfDefaultModelNames(defaultModelsOfProvider.vLLM),
+		_didFillInProviderSettings: undefined,
+	},
+	llamaCpp: { // local, autodetected
+		...defaultCustomSettings,
+		...defaultProviderSettings.llamaCpp,
+		...modelInfoOfDefaultModelNames(defaultModelsOfProvider.llamaCpp),
 		_didFillInProviderSettings: undefined,
 	},
 	googleVertex: { // aggregator (serves models from multiple providers)

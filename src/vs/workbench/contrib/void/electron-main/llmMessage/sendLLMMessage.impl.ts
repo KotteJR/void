@@ -94,6 +94,10 @@ const newOpenAICompatibleSDK = async ({ settingsOfProvider, providerName, includ
 		const thisConfig = settingsOfProvider[providerName]
 		return new OpenAI({ baseURL: `${thisConfig.endpoint}/v1`, apiKey: 'noop', ...commonPayloadOpts })
 	}
+	else if (providerName === 'llamaCpp') {
+		const thisConfig = settingsOfProvider[providerName]
+		return new OpenAI({ baseURL: `${thisConfig.endpoint}/v1`, apiKey: 'noop', ...commonPayloadOpts })
+	}
 	else if (providerName === 'openRouter') {
 		const thisConfig = settingsOfProvider[providerName]
 		return new OpenAI({
@@ -649,6 +653,46 @@ const ollamaList = async ({ onSuccess: onSuccess_, onError: onError_, settingsOf
 	}
 }
 
+// llama.cpp server has a native /infill endpoint that applies the model's FIM template server-side
+// (requires a model with FIM tokens, e.g. Qwen2.5-Coder). https://github.com/ggml-org/llama.cpp/tree/master/tools/server
+const sendLlamaCppFIM = ({ messages, onFinalMessage, onError, settingsOfProvider, modelName, _setAborter }: SendFIMParams_Internal) => {
+	const thisConfig = settingsOfProvider.llamaCpp
+	const endpoint = thisConfig.endpoint.replace(/\/+$/, '')
+
+	const controller = new AbortController()
+	_setAborter(() => controller.abort())
+
+	fetch(`${endpoint}/infill`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({
+			input_prefix: messages.prefix,
+			input_suffix: messages.suffix,
+			prompt: '',
+			n_predict: 300,
+			stop: messages.stopTokens,
+			stream: false,
+		}),
+		signal: controller.signal,
+	})
+		.then(async res => {
+			if (!res.ok) {
+				const errText = await res.text().catch(() => '')
+				// fall back to OpenAI-compatible completions w/ suffix if /infill is unsupported by this server/model
+				if (res.status === 404 || res.status === 501) {
+					throw new Error(`llama.cpp /infill not available (${res.status}). ${errText}`)
+				}
+				throw new Error(`llama.cpp /infill error ${res.status}: ${errText}`)
+			}
+			const data = await res.json()
+			const fullText = typeof data?.content === 'string' ? data.content : ''
+			onFinalMessage({ fullText, fullReasoning: '', anthropicReasoning: null })
+		})
+		.catch((error) => {
+			onError({ message: error + '', fullError: error })
+		})
+}
+
 const sendOllamaFIM = ({ messages, onFinalMessage, onError, settingsOfProvider, modelName, _setAborter }: SendFIMParams_Internal) => {
 	const thisConfig = settingsOfProvider.ollama
 	const ollama = newOllamaSDK({ endpoint: thisConfig.endpoint })
@@ -915,6 +959,11 @@ export const sendLLMMessageToProviderImplementation = {
 		// lmStudio has no suffix parameter in /completions, so sendFIM might not work
 		sendChat: (params) => _sendOpenAICompatibleChat(params),
 		sendFIM: (params) => _sendOpenAICompatibleFIM(params),
+		list: (params) => _openaiCompatibleList(params),
+	},
+	llamaCpp: {
+		sendChat: (params) => _sendOpenAICompatibleChat(params),
+		sendFIM: sendLlamaCppFIM,
 		list: (params) => _openaiCompatibleList(params),
 	},
 	liteLLM: {

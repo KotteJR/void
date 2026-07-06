@@ -103,7 +103,7 @@ export class MetricsMainService extends Disposable implements IMetricsService {
 
 		const isDevMode = !this._envMainService.isBuilt // found in abstractUpdateService.ts
 
-		// custom properties we identify
+		// custom properties (kept for local debug info only - never sent anywhere)
 		this._initProperties = {
 			commit,
 			vscodeVersion: version,
@@ -118,31 +118,13 @@ export class MetricsMainService extends Disposable implements IMetricsService {
 			...osInfo,
 		}
 
-		const identifyMessage = {
-			distinctId: this.distinctId,
-			properties: this._initProperties,
-		}
-
-		const didOptOut = this._appStorage.getBoolean(OPT_OUT_KEY, StorageScope.APPLICATION, false)
-
-		console.log('User is opted out of basic Void metrics?', didOptOut)
-		if (didOptOut) {
-			this.client.optOut()
-		}
-		else {
-			this.client.optIn()
-			this.client.identify(identifyMessage)
-		}
-
-
-		console.log('Void posthog metrics info:', JSON.stringify(identifyMessage, null, 2))
+		// Telemetry is disabled in this build - always opt out, never identify or send.
+		this.client.optOut()
 	}
 
 
 	capture: IMetricsService['capture'] = (event, params) => {
-		const capture = { distinctId: this.distinctId, event, properties: params } as const
-		// console.log('full capture:', this.distinctId)
-		this.client.capture(capture)
+		// Telemetry disabled in this build - no-op.
 	}
 
 	setOptOut: IMetricsService['setOptOut'] = (newVal: boolean) => {

@@ -25,6 +25,9 @@ import './autocompleteService.js'
 // settings pane
 import './voidSettingsPane.js'
 
+// ---------- standalone full-window chat editor ----------
+import './chatPane.js'
+
 // register css
 import './media/void.css'
 

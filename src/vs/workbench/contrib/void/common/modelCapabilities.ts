@@ -25,6 +25,9 @@ export const defaultProviderSettings = {
 	vLLM: {
 		endpoint: 'http://localhost:8000',
 	},
+	llamaCpp: {
+		endpoint: 'http://localhost:3000',
+	},
 	openRouter: {
 		apiKey: '',
 	},
@@ -112,6 +115,8 @@ export const defaultModelsOfProvider = {
 	ollama: [ // autodetected
 	],
 	vLLM: [ // autodetected
+	],
+	llamaCpp: [ // autodetected
 	],
 	lmStudio: [], // autodetected
 
@@ -230,7 +235,10 @@ type ProviderReasoningIOSettings = {
 	// needsManualParse: whether we must manually parse out the <think> tags
 	output?:
 	| { nameOfFieldInDelta?: string, needsManualParse?: undefined, }
-	| { nameOfFieldInDelta?: undefined, needsManualParse?: true, };
+	| { nameOfFieldInDelta?: undefined, needsManualParse?: true, }
+	// some providers (eg. llama.cpp) put reasoning in a delta field when the chat template is recognized,
+	// but leave raw <think> tags in content otherwise - allow both simultaneously
+	| { nameOfFieldInDelta?: string, needsManualParse?: true, };
 }
 
 type VoidStaticProviderInfo = { // doesn't change (not stateful)
@@ -1224,6 +1232,23 @@ const vLLMSettings: VoidStaticProviderInfo = {
 	},
 }
 
+const llamaCppSettings: VoidStaticProviderInfo = {
+	// llama.cpp applies the model's FIM template server-side via /infill, so expose FIM for any loaded model.
+	// If the loaded model has no FIM tokens, /infill returns an error that surfaces normally.
+	modelOptionsFallback: (modelName) => {
+		const res = extensiveModelOptionsFallback(modelName, { downloadable: { sizeGb: 'not-known' } })
+		if (res) res.supportsFIM = true
+		return res
+	},
+	modelOptions: {},
+	providerReasoningIOSettings: {
+		// llama.cpp server (with --jinja) extracts reasoning into `reasoning_content` in the delta.
+		// If the chat template isn't recognized, think tags stay in `content`, so we also parse manually.
+		input: { includeInPayload: openAICompatIncludeInPayloadReasoning },
+		output: { nameOfFieldInDelta: 'reasoning_content', needsManualParse: true },
+	},
+}
+
 const lmStudioSettings: VoidStaticProviderInfo = {
 	modelOptionsFallback: (modelName) => extensiveModelOptionsFallback(modelName, { downloadable: { sizeGb: 'not-known' }, contextWindow: 4_096 }),
 	modelOptions: {},
@@ -1470,6 +1495,7 @@ const modelSettingsOfProvider: { [providerName in ProviderName]: VoidStaticProvi
 
 	liteLLM: liteLLMSettings,
 	lmStudio: lmStudioSettings,
+	llamaCpp: llamaCppSettings,
 
 	googleVertex: googleVertexSettings,
 	microsoftAzure: microsoftAzureSettings,
