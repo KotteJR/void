@@ -1262,9 +1262,10 @@ const ollamaSettings: VoidStaticProviderInfo = {
 	modelOptionsFallback: (modelName) => extensiveModelOptionsFallback(modelName, { downloadable: { sizeGb: 'not-known' } }),
 	modelOptions: ollamaModelOptions,
 	providerReasoningIOSettings: {
-		// reasoning: we need to filter out reasoning <think> tags manually
+		// Ollama's OpenAI-compatible endpoint streams thinking in `delta.reasoning`;
+		// models whose template isn't recognized leave <think> tags in content instead.
 		input: { includeInPayload: openAICompatIncludeInPayloadReasoning },
-		output: { needsManualParse: true },
+		output: { nameOfFieldInDelta: 'reasoning', needsManualParse: true },
 	},
 }
 
